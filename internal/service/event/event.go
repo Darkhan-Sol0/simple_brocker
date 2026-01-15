@@ -7,11 +7,13 @@ import (
 
 type (
 	event struct {
+		group     string
 		data      json.RawMessage
 		create_at time.Time
 		attempts  int
 	}
 	Event interface {
+		GetGroup() string
 		GetData() json.RawMessage
 		GetCreateDate() time.Time
 		GetCreateDateF() string
@@ -20,12 +22,17 @@ type (
 	}
 )
 
-func New(data json.RawMessage) Event {
+func New(group string, data json.RawMessage) Event {
 	return &event{
+		group:     group,
 		data:      data,
 		create_at: time.Now(),
 		attempts:  0,
 	}
+}
+
+func (e *event) GetGroup() string {
+	return e.group
 }
 
 func (e *event) GetData() json.RawMessage {

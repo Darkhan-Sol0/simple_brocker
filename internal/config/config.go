@@ -10,26 +10,26 @@ import (
 
 type (
 	config struct {
-		Address  string                 `yaml:"address"`
-		Services map[string]serviceConf `yaml:"services"`
+		Address string                `yaml:"address"`
+		Groups  map[string]*groupConf `yaml:"group"`
 	}
 
-	serviceConf struct {
-		Address   string        `yaml:"address"`
+	groupConf struct {
+		Address   []string      `yaml:"address"`
 		CoolDown  time.Duration `yaml:"cooldown"`
 		BatchSize int           `yaml:"batch_size"`
 	}
 
-	ServiceConf interface {
-		GetServiceAddress() string
+	GroupConf interface {
+		GetServiceAddress() []string
 		GetServiceBatchSize() int
 		GetCoolDown() time.Duration
 	}
 
 	Config interface {
 		GetAddress() string
-		GetServices() map[string]serviceConf
-		GetService(key string) ServiceConf
+		GetGroups() map[string]*groupConf
+		GetGroup(key string) GroupConf
 	}
 )
 
@@ -53,23 +53,22 @@ func (c *config) GetAddress() string {
 	return c.Address
 }
 
-func (c *serviceConf) GetCoolDown() time.Duration {
-	return c.CoolDown
+func (c *config) GetGroups() map[string]*groupConf {
+	return c.Groups
 }
 
-func (c *config) GetServices() map[string]serviceConf {
-	return c.Services
+func (c *config) GetGroup(key string) GroupConf {
+	return c.Groups[key]
+
+}
+func (g *groupConf) GetCoolDown() time.Duration {
+	return g.CoolDown
 }
 
-func (c *config) GetService(key string) ServiceConf {
-	s := c.Services[key]
-	return &s
+func (g *groupConf) GetServiceAddress() []string {
+	return g.Address
 }
 
-func (c *serviceConf) GetServiceAddress() string {
-	return c.Address
-}
-
-func (c *serviceConf) GetServiceBatchSize() int {
-	return c.BatchSize
+func (g *groupConf) GetServiceBatchSize() int {
+	return g.BatchSize
 }

@@ -1,17 +1,21 @@
 package main
 
 import (
-	"simple_brocker/internal/server"
+	"simple_brocker/internal/config"
+	"simple_brocker/internal/service/most"
+	"simple_brocker/internal/service/thread"
 )
 
 func main() {
-	// cfg := config.GetConfig()
-	// t := thread.New(cfg)
-	// ioChan := most.New(cfg)
-	// ioChan.MakeMost()
-	// t.AddThread()
-	// t.TRun(ioChan)
+	cfg := config.GetConfig()
 
-	s := server.New()
-	s.Run()
+	// fmt.Println(cfg)
+	// fmt.Println(cfg.GetService("group1"))
+
+	ioChan := most.New(cfg)
+	t := thread.New(cfg, ioChan)
+	t.TRun(ioChan)
+
+	// s := server.New()
+	// s.Run()
 }

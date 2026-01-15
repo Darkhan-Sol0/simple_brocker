@@ -6,12 +6,13 @@ import (
 	"simple_brocker/internal/service/event"
 	"simple_brocker/internal/service/queue/dispatch"
 	"simple_brocker/internal/service/queue/ingestion"
+	"sync"
 )
 
 type (
 	queue struct {
 		ingestion ingestion.Ingestion
-		dispatch  dispatch.Dispatch
+		dispatch  map[string]dispatch.Dispatch
 	}
 
 	Queue interface {
@@ -22,16 +23,23 @@ type (
 	}
 )
 
-func New(cfg config.ServiceConf) Queue {
+func New(cfg config.Config) Queue {
+	ds := make(map[string]dispatch.Dispatch)
+	for i := range cfg.GetGroups() {
+		ds[i] = dispatch.New(cfg.GetGroup(i))
+	}
+
 	return &queue{
-		ingestion: ingestion.New(cfg),
-		dispatch:  dispatch.New(cfg),
+		ingestion: ingestion.New(),
+		dispatch:  ds,
 	}
 }
 
 func (q *queue) Close() {
 	q.ingestion.Close()
-	q.dispatch.Close()
+	for _, i := range q.dispatch {
+		i.Close()
+	}
 }
 
 func (q *queue) Producer(ctx context.Context, ch <-chan event.Event) {
@@ -49,21 +57,28 @@ func (q *queue) Producer(ctx context.Context, ch <-chan event.Event) {
 }
 
 func (q *queue) Consumer(ctx context.Context, ch chan<- []event.Event) {
-	for {
-		select {
-		case <-ctx.Done():
-			close(ch)
-			return
-		default:
-			ev := q.dispatch.TakeEvent()
-			select {
-			case <-ctx.Done():
-				close(ch)
-				return
-			case ch <- ev:
+	var wg sync.WaitGroup
+	for _, i := range q.dispatch {
+		wg.Add(1)
+		go func(d dispatch.Dispatch) {
+			defer wg.Done()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					ev := d.TakeEvent()
+					select {
+					case <-ctx.Done():
+						return
+					case ch <- ev:
+					}
+				}
 			}
-		}
+		}(i)
 	}
+	wg.Wait()
+	close(ch)
 }
 
 func (q *queue) Logging(ctx context.Context) {
@@ -74,7 +89,7 @@ func (q *queue) Logging(ctx context.Context) {
 		default:
 			ev := q.ingestion.TakeEvent()
 			// log.Println("ADD: ", ev.GetData())
-			q.dispatch.AddEvent(ev)
+			q.dispatch[ev.GetGroup()].AddEvent(ev)
 		}
 	}
 }

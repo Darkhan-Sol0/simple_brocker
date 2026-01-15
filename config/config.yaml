@@ -1,18 +1,18 @@
 address: "0.0.0.0:8080"
 cooldown: 20s
 
-services:
-  serv1:
-    address: "serv1:8081"
+group:
+  group1:
+    address: ["serv1:8081", "serv2:8082", "serv3:8083"]
     cooldown: 5s
     batch_size: 10
 
-  serv2:
-    address: "serv2:8082"
+  group2:
+    address: ["serv1:8081", "serv2:8082"]
     cooldown: 10s
     batch_size: 15
 
-  serv3:
-    address: "serv3:8083"
+  group3:
+    address: ["serv3:8083"]
     cooldown: 20s
     batch_size: 20

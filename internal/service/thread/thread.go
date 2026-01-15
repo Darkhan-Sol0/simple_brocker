@@ -19,45 +19,34 @@ import (
 type (
 	thread struct {
 		cfg         config.Config
-		threadQueue map[string]queue.Queue
+		ioCh        most.Most
+		threadQueue queue.Queue
 	}
 
 	Thread interface {
-		AddThread()
-		Run(ctx context.Context, ioCh most.Most)
+		Run(ctx context.Context)
 		Close()
 
 		TRun(ioCh most.Most)
 	}
 )
 
-func New(cfg config.Config) Thread {
+func New(cfg config.Config, ioCh most.Most) Thread {
 	return &thread{
 		cfg:         cfg,
-		threadQueue: make(map[string]queue.Queue),
-	}
-}
-
-func (t *thread) AddThread() {
-	ms := t.cfg.GetServices()
-	for i, j := range ms {
-		t.threadQueue[i] = queue.New(&j)
+		ioCh:        ioCh,
+		threadQueue: queue.New(cfg),
 	}
 }
 
 func (t *thread) Close() {
-	for _, j := range t.threadQueue {
-		j.Close()
-	}
+	t.threadQueue.Close()
 }
 
-func (t *thread) Run(ctx context.Context, ioCh most.Most) {
-	for i, j := range t.threadQueue {
-		go j.Producer(ctx, ioCh.GetInChan(i))
-		go j.Logging(ctx)
-		go j.Consumer(ctx, ioCh.GetOutChan(i))
-	}
-
+func (t *thread) Run(ctx context.Context) {
+	go t.threadQueue.Producer(ctx, t.ioCh.GetIn())
+	go t.threadQueue.Logging(ctx)
+	go t.threadQueue.Consumer(ctx, t.ioCh.GetOut())
 }
 
 // ---TESTing FUNC---
@@ -65,11 +54,9 @@ func (t *thread) TRun(ioCh most.Most) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	for i, j := range t.threadQueue {
-		go j.Producer(ctx, ioCh.GetInChan(i))
-		go j.Logging(ctx)
-		go j.Consumer(ctx, ioCh.GetOutChan(i))
-	}
+	go t.threadQueue.Producer(ctx, ioCh.GetIn())
+	go t.threadQueue.Logging(ctx)
+	go t.threadQueue.Consumer(ctx, ioCh.GetOut())
 
 	go GenEv(ctx, ioCh.GetIn())
 	go PrintEv(ctx, ioCh.GetOut())
@@ -86,46 +73,41 @@ func (t *thread) TRun(ioCh most.Most) {
 }
 
 // ---TESTing FUNC---
-func GenEv(ctx context.Context, ch map[string]chan event.Event) {
+func GenEv(ctx context.Context, ch chan event.Event) {
 	for i := 1; i <= 1000; i++ {
 		s, _ := json.Marshal(fmt.Sprintf("hui %d", i))
-		ev := event.New(s)
-		k := fmt.Sprintf("serv%d", rand.Int()%3+1)
+		ev := event.New(fmt.Sprintf("group%d", rand.Int()%3+1), s)
 		select {
 		case <-ctx.Done():
-			for _, j := range ch {
-				close(j)
-			}
+			close(ch)
 			return
-		case ch[k] <- ev:
+		case ch <- ev:
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
-	for _, j := range ch {
-		close(j)
-	}
+
+	close(ch)
+
 }
 
 // ---TESTing FUNC---
-func PrintEv(ctx context.Context, ch map[string]chan []event.Event) {
+func PrintEv(ctx context.Context, ch chan []event.Event) {
 	for {
-		for i, j := range ch {
+		select {
+		case <-ctx.Done():
+			return
+		default:
 			select {
 			case <-ctx.Done():
 				return
-			default:
-				select {
-				case <-ctx.Done():
-					return
-				case k := <-j:
-					fmt.Println("---Pack ", i, "---")
-					for l, p := range k {
-						var text string
-						json.Unmarshal(p.GetData(), &text)
-						fmt.Println(l, "OUT: ", text, " - ", p.GetCreateDateF())
-					}
-					fmt.Println("---End ", i, "---")
+			case k := <-ch:
+				fmt.Println("---Pack ", k[0].GetGroup(), "---")
+				for l, p := range k {
+					var text string
+					json.Unmarshal(p.GetData(), &text)
+					fmt.Println(l, "OUT: ", text, " - ", p.GetCreateDateF())
 				}
+				fmt.Println("---End ", k[0].GetGroup(), "---")
 			}
 		}
 	}

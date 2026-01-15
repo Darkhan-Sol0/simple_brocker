@@ -9,7 +9,7 @@ import (
 
 type (
 	dispatchQueue struct {
-		cfg   config.ServiceConf
+		cfg   config.GroupConf
 		queue chan event.Event
 	}
 
@@ -20,7 +20,7 @@ type (
 	}
 )
 
-func New(cfg config.ServiceConf) Dispatch {
+func New(cfg config.GroupConf) Dispatch {
 	return &dispatchQueue{
 		cfg:   cfg,
 		queue: make(chan event.Event, 100),
@@ -37,6 +37,8 @@ func (d *dispatchQueue) AddEvent(event event.Event) {
 
 func (d *dispatchQueue) TakeEvent() []event.Event {
 	ev := make([]event.Event, 0)
+	timer := time.NewTimer(d.cfg.GetCoolDown())
+	defer timer.Stop()
 
 	for {
 		select {
@@ -45,12 +47,13 @@ func (d *dispatchQueue) TakeEvent() []event.Event {
 			if len(ev) >= d.cfg.GetServiceBatchSize() {
 				return ev
 			}
-		case <-time.After(d.cfg.GetCoolDown()):
+			timer.Reset(d.cfg.GetCoolDown())
+		case <-timer.C:
 			if len(ev) > 0 {
 				fmt.Println("Zaderzka")
 				return ev
 			}
-			continue
+			timer.Reset(d.cfg.GetCoolDown())
 		}
 	}
 }

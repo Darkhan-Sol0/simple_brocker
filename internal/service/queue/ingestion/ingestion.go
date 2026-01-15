@@ -1,13 +1,11 @@
 package ingestion
 
 import (
-	"simple_brocker/internal/config"
 	"simple_brocker/internal/service/event"
 )
 
 type (
 	ingestionQueue struct {
-		cfg   config.Config
 		queue chan event.Event
 	}
 
@@ -18,7 +16,7 @@ type (
 	}
 )
 
-func New(cfg config.ServiceConf) Ingestion {
+func New() Ingestion {
 	return &ingestionQueue{
 		queue: make(chan event.Event, 100),
 	}

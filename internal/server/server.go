@@ -34,7 +34,6 @@ func New() Server {
 	return &server{
 		httpDriver: echo.New(),
 		cfg:        cfg,
-		thread:     thread.New(cfg),
 	}
 }
 
@@ -59,10 +58,9 @@ func (s *server) Run() {
 	ctx, stop := context.WithCancel(context.Background())
 	defer stop()
 	ioChan := most.New(s.cfg)
-	ioChan.MakeMost()
 	defer ioChan.Close()
-	s.thread.AddThread()
-	s.thread.Run(ctx, ioChan)
+	s.thread = thread.New(s.cfg, ioChan)
+	s.thread.Run(ctx)
 	defer s.thread.Close()
 	go func() {
 		s.start()
