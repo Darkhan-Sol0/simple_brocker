@@ -62,6 +62,8 @@ func (s *server) Run() {
 	s.thread = thread.New(s.cfg, ioChan)
 	s.thread.Run(ctx)
 	defer s.thread.Close()
+	s.router = web.New(ioChan)
+	s.router.RegisterRoutes(s.httpDriver)
 	go func() {
 		s.start()
 	}()

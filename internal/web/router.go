@@ -23,5 +23,5 @@ func New(ioChan most.Most) Router {
 }
 
 func (r *router) RegisterRoutes(e *echo.Echo) {
-	e.POST("/", r.RequestAdd)
+	e.POST("/:group", r.RequestEvent)
 }
