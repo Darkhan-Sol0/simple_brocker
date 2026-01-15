@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"simple_brocker/internal/config"
 	"simple_brocker/internal/service/event"
+	"simple_brocker/internal/service/most"
 	"simple_brocker/internal/service/queue"
 	"syscall"
 	"time"
@@ -21,16 +22,12 @@ type (
 		threadQueue map[string]queue.Queue
 	}
 
-	ioChan struct {
-		chIn  map[string]chan event.Event
-		chOut map[string]chan []event.Event
-	}
-
 	Thread interface {
 		AddThread()
-		Run(ctx context.Context, ioCh ioChan)
+		Run(ctx context.Context, ioCh most.Most)
+		Close()
 
-		TRun()
+		TRun(ioCh most.Most)
 	}
 )
 
@@ -54,37 +51,28 @@ func (t *thread) Close() {
 	}
 }
 
-func (t *thread) Run(ctx context.Context, ioCh ioChan) {
+func (t *thread) Run(ctx context.Context, ioCh most.Most) {
 	for i, j := range t.threadQueue {
-		go j.Producer(ctx, ioCh.chIn[i])
+		go j.Producer(ctx, ioCh.GetInChan(i))
 		go j.Logging(ctx)
-		go j.Consumer(ctx, ioCh.chOut[i])
+		go j.Consumer(ctx, ioCh.GetOutChan(i))
 	}
 
 }
 
-func (t *thread) TRun() {
+// ---TESTing FUNC---
+func (t *thread) TRun(ioCh most.Most) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ioCh := ioChan{
-		chIn:  make(map[string]chan event.Event),
-		chOut: make(map[string]chan []event.Event),
-	}
-
-	for i := range t.threadQueue {
-		ioCh.chIn[i] = make(chan event.Event, 100)
-		ioCh.chOut[i] = make(chan []event.Event, 10)
-	}
-
 	for i, j := range t.threadQueue {
-		go j.Producer(ctx, ioCh.chIn[i])
+		go j.Producer(ctx, ioCh.GetInChan(i))
 		go j.Logging(ctx)
-		go j.Consumer(ctx, ioCh.chOut[i])
+		go j.Consumer(ctx, ioCh.GetOutChan(i))
 	}
 
-	go GenEv(ctx, ioCh.chIn)
-	go PrintEv(ctx, ioCh.chOut)
+	go GenEv(ctx, ioCh.GetIn())
+	go PrintEv(ctx, ioCh.GetOut())
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
