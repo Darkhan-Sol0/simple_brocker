@@ -4,15 +4,15 @@ cooldown: 20s
 group:
   group1:
     address: ["serv1:8081", "serv2:8082", "serv3:8083"]
-    cooldown: 5s
+    cooldown: 1s
     batch_size: 10
 
   group2:
     address: ["serv1:8081", "serv2:8082"]
-    cooldown: 10s
+    cooldown: 1s
     batch_size: 15
 
   group3:
     address: ["serv3:8083"]
-    cooldown: 20s
+    cooldown: 1s
     batch_size: 20

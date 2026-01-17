@@ -62,11 +62,10 @@ func (s *server) Run() {
 	s.thread = thread.New(s.cfg, ioChan)
 	s.thread.Run(ctx)
 	defer s.thread.Close()
-	s.router = web.New(ioChan)
+	s.router = web.New(s.cfg, ioChan)
 	s.router.RegisterRoutes(s.httpDriver)
-	go func() {
-		s.start()
-	}()
+	go s.start()
+	go s.router.ResponseEvent(ctx, ioChan.GetOut())
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 	select {

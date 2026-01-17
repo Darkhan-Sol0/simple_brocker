@@ -88,7 +88,7 @@ func (q *queue) Logging(ctx context.Context) {
 			return
 		default:
 			ev := q.ingestion.TakeEvent()
-			// log.Println("ADD: ", ev.GetData())
+			// log.Println("ADD: ", ev.GetData()) // Нужна отдельная функция, для запись. Пока так.
 			q.dispatch[ev.GetGroup()].AddEvent(ev)
 		}
 	}
