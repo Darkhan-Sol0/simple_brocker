@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -55,12 +56,12 @@ func (r *router) ResponseEvent(ctx context.Context, ch <-chan []event.Event) err
 			// 	Bool bool   `json:"bool"`
 			// }
 
-			// payload, _ := json.Marshal(buff)
+			payload, _ := json.Marshal(buff)
 
-			// fmt.Println(buff)
-			// tes := []aaaa{}
-			// json.Unmarshal(payload, &tes)
-			// fmt.Println(tes)
+			fmt.Println(buff)
+			var tes any
+			json.Unmarshal(payload, &tes)
+			fmt.Println(tes)
 		}
 	}
 }

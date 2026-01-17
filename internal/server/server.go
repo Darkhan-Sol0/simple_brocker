@@ -8,7 +8,7 @@ import (
 	"os/signal"
 	"simple_brocker/internal/config"
 	"simple_brocker/internal/service/most"
-	"simple_brocker/internal/service/thread"
+	"simple_brocker/internal/service/queue"
 	"simple_brocker/internal/web"
 	"syscall"
 	"time"
@@ -20,7 +20,6 @@ type (
 	server struct {
 		httpDriver *echo.Echo
 		cfg        config.Config
-		thread     thread.Thread
 		router     web.Router
 	}
 
@@ -57,15 +56,22 @@ func (s *server) shutdown(ctx context.Context) {
 func (s *server) Run() {
 	ctx, stop := context.WithCancel(context.Background())
 	defer stop()
+
 	ioChan := most.New(s.cfg)
 	defer ioChan.Close()
-	s.thread = thread.New(s.cfg, ioChan)
-	s.thread.Run(ctx)
-	defer s.thread.Close()
+
+	queue := queue.New(s.cfg, ioChan)
+	defer queue.Close()
+
+	go queue.Producer(ctx)
+	go queue.Consumer(ctx)
+
 	s.router = web.New(s.cfg, ioChan)
 	s.router.RegisterRoutes(s.httpDriver)
+
 	go s.start()
 	go s.router.ResponseEvent(ctx, ioChan.GetOut())
+
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 	select {
@@ -74,5 +80,6 @@ func (s *server) Run() {
 	case <-quit:
 		log.Println("Received termination signal, stopping server...")
 	}
+
 	s.shutdown(ctx)
 }
