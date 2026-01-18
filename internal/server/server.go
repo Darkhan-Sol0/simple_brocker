@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/signal"
 	"simple_brocker/internal/config"
-	"simple_brocker/internal/service/most"
 	"simple_brocker/internal/service/queue"
 	"simple_brocker/internal/web"
 	"syscall"
@@ -57,20 +56,17 @@ func (s *server) Run() {
 	ctx, stop := context.WithCancel(context.Background())
 	defer stop()
 
-	ioChan := most.New(s.cfg)
-	defer ioChan.Close()
-
-	queue := queue.New(s.cfg, ioChan)
+	queue := queue.New(s.cfg)
 	defer queue.Close()
 
 	go queue.Producer(ctx)
 	go queue.Consumer(ctx)
 
-	s.router = web.New(s.cfg, ioChan)
+	s.router = web.New(s.cfg, queue.GetIn())
 	s.router.RegisterRoutes(s.httpDriver)
 
 	go s.start()
-	go s.router.ResponseEvent(ctx, ioChan.GetOut())
+	go s.router.ResponseEvent(ctx, queue.GetOut())
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)

@@ -1,6 +1,7 @@
 package dispatch
 
 import (
+	"context"
 	"fmt"
 	"simple_brocker/internal/config"
 	"simple_brocker/internal/service/event"
@@ -9,21 +10,23 @@ import (
 
 type (
 	dispatchQueue struct {
-		cfg   config.GroupConf
-		queue chan event.Event
+		cfg       config.GroupConf
+		queue     chan event.Event
+		groupName string
 	}
 
 	Dispatch interface {
 		Close()
 		AddEvent(event event.Event)
-		TakeEvent() []event.Event
+		TakeEvent(ctx context.Context) []event.Event
 	}
 )
 
-func New(cfg config.GroupConf) Dispatch {
+func New(cfg config.GroupConf, groupName string) Dispatch {
 	return &dispatchQueue{
-		cfg:   cfg,
-		queue: make(chan event.Event, 100),
+		cfg:       cfg,
+		queue:     make(chan event.Event, 100),
+		groupName: groupName,
 	}
 }
 
@@ -35,13 +38,19 @@ func (d *dispatchQueue) AddEvent(event event.Event) {
 	d.queue <- event
 }
 
-func (d *dispatchQueue) TakeEvent() []event.Event {
+func (d *dispatchQueue) TakeEvent(ctx context.Context) []event.Event {
 	ev := make([]event.Event, 0)
+
 	timer := time.NewTimer(d.cfg.GetCoolDown())
 	defer timer.Stop()
 
 	for {
 		select {
+		case <-ctx.Done():
+			if len(ev) > 0 {
+				return ev
+			}
+			return nil
 		case e := <-d.queue:
 			ev = append(ev, e)
 			if len(ev) >= d.cfg.GetServiceBatchSize() {
@@ -56,4 +65,8 @@ func (d *dispatchQueue) TakeEvent() []event.Event {
 			timer.Reset(d.cfg.GetCoolDown())
 		}
 	}
+}
+
+func (d *dispatchQueue) GetGroupName() string {
+	return d.groupName
 }

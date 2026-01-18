@@ -15,6 +15,6 @@ func (r *router) RequestEvent(ctx echo.Context) error {
 		return ctx.JSON(http.StatusBadRequest, "error: poka net")
 	}
 	ev := event.New(group, message)
-	r.ioChan.GetIn() <- ev
+	r.ch <- ev
 	return nil
 }

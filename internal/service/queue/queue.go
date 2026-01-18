@@ -2,14 +2,17 @@ package queue
 
 import (
 	"context"
+	"log"
 	"simple_brocker/internal/config"
 	"simple_brocker/internal/service/dispatch"
-	"simple_brocker/internal/service/most"
+	"simple_brocker/internal/service/event"
+	"sync"
 )
 
 type (
 	queue struct {
-		most     most.Most
+		chIn     chan event.Event
+		chOut    chan []event.Event
 		dispatch map[string]dispatch.Dispatch
 	}
 
@@ -17,17 +20,29 @@ type (
 		Producer(ctx context.Context)
 		Consumer(ctx context.Context)
 		Close()
+
+		GetIn() chan event.Event
+		GetOut() chan []event.Event
 	}
 )
 
-func New(cfg config.Config, most most.Most) Queue {
+func (q *queue) GetIn() chan event.Event {
+	return q.chIn
+}
+
+func (q *queue) GetOut() chan []event.Event {
+	return q.chOut
+}
+
+func New(cfg config.Config) Queue {
 	ds := make(map[string]dispatch.Dispatch)
 	for i := range cfg.GetGroups() {
-		ds[i] = dispatch.New(cfg.GetGroup(i))
+		ds[i] = dispatch.New(cfg.GetGroup(i), i)
 	}
 
 	return &queue{
-		most:     most,
+		chIn:     make(chan event.Event, 100),
+		chOut:    make(chan []event.Event, 10),
 		dispatch: ds,
 	}
 }
@@ -36,6 +51,8 @@ func (q *queue) Close() {
 	for _, i := range q.dispatch {
 		i.Close()
 	}
+	close(q.chIn)
+	close(q.chOut)
 }
 
 func (q *queue) Producer(ctx context.Context) {
@@ -43,31 +60,40 @@ func (q *queue) Producer(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
-		case ev, ok := <-q.most.GetIn():
+		case ev, ok := <-q.chIn:
 			if !ok {
 				return
 			}
-			q.dispatch[ev.GetGroup()].AddEvent(ev)
+			d, exist := q.dispatch[ev.GetGroup()]
+			if !exist {
+				log.Printf("group %s not found", ev.GetGroup())
+				continue
+			}
+			d.AddEvent(ev)
 		}
 	}
 }
 
 func (q *queue) Consumer(ctx context.Context) {
+	var wg sync.WaitGroup
 	for _, i := range q.dispatch {
+		wg.Add(1)
 		go func(d dispatch.Dispatch) {
+			defer wg.Done()
 			for {
 				select {
 				case <-ctx.Done():
 					return
 				default:
-					ev := d.TakeEvent()
+					ev := d.TakeEvent(ctx)
 					select {
 					case <-ctx.Done():
 						return
-					case q.most.GetOut() <- ev:
+					case q.chOut <- ev:
 					}
 				}
 			}
 		}(i)
 	}
+	wg.Wait()
 }
