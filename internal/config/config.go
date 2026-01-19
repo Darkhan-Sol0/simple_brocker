@@ -18,12 +18,14 @@ type (
 		Address   []string      `yaml:"address"`
 		CoolDown  time.Duration `yaml:"cooldown"`
 		BatchSize int           `yaml:"batch_size"`
+		Retry     int           `yaml:"retry"`
 	}
 
 	GroupConf interface {
 		GetServiceAddress() []string
 		GetServiceBatchSize() int
 		GetCoolDown() time.Duration
+		GetRetry() int
 	}
 
 	Config interface {
@@ -71,4 +73,8 @@ func (g *groupConf) GetServiceAddress() []string {
 
 func (g *groupConf) GetServiceBatchSize() int {
 	return g.BatchSize
+}
+
+func (g *groupConf) GetRetry() int {
+	return g.Retry
 }

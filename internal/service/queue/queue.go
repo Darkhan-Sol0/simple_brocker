@@ -6,6 +6,7 @@ import (
 	"simple_brocker/internal/config"
 	"simple_brocker/internal/service/dispatch"
 	"simple_brocker/internal/service/event"
+	"simple_brocker/internal/service/logging"
 	"sync"
 )
 
@@ -14,6 +15,8 @@ type (
 		chIn     chan event.Event
 		chOut    chan []event.Event
 		dispatch map[string]dispatch.Dispatch
+
+		log logging.Logger
 	}
 
 	Queue interface {
@@ -40,10 +43,14 @@ func New(cfg config.Config) Queue {
 		ds[i] = dispatch.New(cfg.GetGroup(i), i)
 	}
 
+	l, _ := logging.New()
+
 	return &queue{
 		chIn:     make(chan event.Event, 100),
 		chOut:    make(chan []event.Event, 10),
 		dispatch: ds,
+
+		log: l,
 	}
 }
 
@@ -53,6 +60,7 @@ func (q *queue) Close() {
 	}
 	close(q.chIn)
 	close(q.chOut)
+	q.log.Close()
 }
 
 func (q *queue) Producer(ctx context.Context) {
@@ -69,6 +77,7 @@ func (q *queue) Producer(ctx context.Context) {
 				log.Printf("group %s not found", ev.GetGroup())
 				continue
 			}
+			q.log.LogEvent(ev)
 			d.AddEvent(ev)
 		}
 	}

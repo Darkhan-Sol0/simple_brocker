@@ -24,8 +24,25 @@ func (r *router) ResponseEvent(ctx context.Context, ch chan []event.Event) error
 				buff = append(buff, j.GetData())
 			}
 			payload := marshalRawMessages(buff)
-			for _, j := range r.cfg.GetGroup(temp[0].GetGroup()).GetServiceAddress() {
-				go senderMessage(j, payload)
+
+			grcfg := r.cfg.GetGroup(temp[0].GetGroup())
+
+			for _, j := range grcfg.GetServiceAddress() {
+				go func(address string, data []byte) {
+					for attempt := 1; attempt <= grcfg.GetRetry(); attempt++ {
+						err := senderMessage(address, data)
+						if err == nil {
+							return
+						}
+						log.Printf("Attempt %d/%d failed for %s: %v",
+							attempt, grcfg.GetRetry(), address, err)
+						if attempt < grcfg.GetRetry() {
+							backoff := time.Duration(attempt*attempt) * 100 * time.Millisecond
+							time.Sleep(backoff)
+						}
+					}
+					log.Printf("All %d attempts failed for %s", grcfg.GetRetry(), address)
+				}(j, payload)
 			}
 			fmt.Println(buff)
 			var tes any
@@ -35,7 +52,7 @@ func (r *router) ResponseEvent(ctx context.Context, ch chan []event.Event) error
 	}
 }
 
-func senderMessage(address string, data json.RawMessage) {
+func senderMessage(address string, data []byte) error {
 	req, _ := http.NewRequest("POST", address, bytes.NewBuffer(data))
 	req.Header.Set("Content-Type", "application/json")
 	client := &http.Client{
@@ -43,14 +60,14 @@ func senderMessage(address string, data json.RawMessage) {
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Printf("Request to %s failed: %v", address, err)
-		return
+		return fmt.Errorf("Request to %s failed: %v", address, err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
 		body, _ := io.ReadAll(resp.Body)
-		log.Printf("Bad response from %s: %d - %s", address, resp.StatusCode, string(body))
+		return fmt.Errorf("Bad response from %s: %d - %s", address, resp.StatusCode, string(body))
 	}
+	return nil
 }
 
 func marshalRawMessages(messages []json.RawMessage) []byte {
