@@ -7,13 +7,12 @@ import (
 	"simple_brocker/internal/service/dispatch"
 	"simple_brocker/internal/service/event"
 	"simple_brocker/internal/service/logging"
-	"sync"
 )
 
 type (
 	queue struct {
-		chIn     chan event.Event
-		chOut    chan []event.Event
+		chIn     chan event.EventIn
+		chOut    chan event.EventOut
 		dispatch map[string]dispatch.Dispatch
 
 		log logging.Logger
@@ -24,16 +23,16 @@ type (
 		Consumer(ctx context.Context)
 		Close()
 
-		GetIn() chan event.Event
-		GetOut() chan []event.Event
+		GetIn() chan event.EventIn
+		GetOut() chan event.EventOut
 	}
 )
 
-func (q *queue) GetIn() chan event.Event {
+func (q *queue) GetIn() chan event.EventIn {
 	return q.chIn
 }
 
-func (q *queue) GetOut() chan []event.Event {
+func (q *queue) GetOut() chan event.EventOut {
 	return q.chOut
 }
 
@@ -46,8 +45,8 @@ func New(cfg config.Config) Queue {
 	l, _ := logging.New()
 
 	return &queue{
-		chIn:     make(chan event.Event, 100),
-		chOut:    make(chan []event.Event, 10),
+		chIn:     make(chan event.EventIn, 100),
+		chOut:    make(chan event.EventOut, 10),
 		dispatch: ds,
 
 		log: l,
@@ -84,11 +83,8 @@ func (q *queue) Producer(ctx context.Context) {
 }
 
 func (q *queue) Consumer(ctx context.Context) {
-	var wg sync.WaitGroup
 	for _, i := range q.dispatch {
-		wg.Add(1)
 		go func(d dispatch.Dispatch) {
-			defer wg.Done()
 			for {
 				select {
 				case <-ctx.Done():
@@ -104,5 +100,4 @@ func (q *queue) Consumer(ctx context.Context) {
 			}
 		}(i)
 	}
-	wg.Wait()
 }

@@ -12,48 +12,48 @@ import (
 	"time"
 )
 
-func (r *router) ResponseEvent(ctx context.Context, ch chan []event.Event) error {
+func (r *router) ResponseEvent(ctx context.Context, ch <-chan event.EventOut) {
 	for {
 		select {
 		case <-ctx.Done():
-			return nil
-		case temp := <-ch:
-			buff := make([]json.RawMessage, 0)
+			return
+		case evs := <-ch:
+			payload := marshalRawMessages(evs.GetData())
 
-			for _, j := range temp {
-				buff = append(buff, j.GetData())
+			for _, j := range r.cfg.GetGroup(evs.GetGroup()).GetServiceAddress() {
+				go retrySender(ctx, j, r.cfg.GetGroup(evs.GetGroup()).GetRetry(), payload)
 			}
-			payload := marshalRawMessages(buff)
-
-			grcfg := r.cfg.GetGroup(temp[0].GetGroup())
-
-			for _, j := range grcfg.GetServiceAddress() {
-				go func(address string, data []byte) {
-					for attempt := 1; attempt <= grcfg.GetRetry(); attempt++ {
-						err := senderMessage(address, data)
-						if err == nil {
-							return
-						}
-						log.Printf("Attempt %d/%d failed for %s: %v",
-							attempt, grcfg.GetRetry(), address, err)
-						if attempt < grcfg.GetRetry() {
-							backoff := time.Duration(attempt*attempt) * 100 * time.Millisecond
-							time.Sleep(backoff)
-						}
-					}
-					log.Printf("All %d attempts failed for %s", grcfg.GetRetry(), address)
-				}(j, payload)
-			}
-			fmt.Println(buff)
-			var tes any
-			json.Unmarshal(payload, &tes)
-			fmt.Println(tes)
 		}
 	}
 }
 
-func senderMessage(address string, data []byte) error {
-	req, _ := http.NewRequest("POST", address, bytes.NewBuffer(data))
+func retrySender(ctx context.Context, address string, try int, data []byte) error {
+	for attempt := 1; attempt <= try; attempt++ {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			err := senderMessage(ctx, address, data)
+			if err == nil {
+				return nil
+			}
+			log.Printf("Attempt %d/%d failed for %s: %v",
+				attempt, try, address, err)
+			if attempt < try {
+				backoff := time.Duration(attempt*attempt) * 100 * time.Millisecond
+				time.Sleep(backoff)
+			}
+		}
+	}
+	log.Printf("All %d attempts failed for %s", try, address)
+	return nil
+}
+
+func senderMessage(ctx context.Context, address string, data []byte) error {
+	req, err := http.NewRequestWithContext(ctx, "POST", address, bytes.NewBuffer(data))
+	if err != nil {
+		return err
+	}
 	req.Header.Set("Content-Type", "application/json")
 	client := &http.Client{
 		Timeout: 5 * time.Second,
@@ -84,3 +84,75 @@ func marshalRawMessages(messages []json.RawMessage) []byte {
 	buf.WriteByte(']')
 	return buf.Bytes()
 }
+
+// func (r *router) ResponseEvent(ctx context.Context, ch chan []event.EventIn) error {
+// 	for {
+// 		select {
+// 		case <-ctx.Done():
+// 			return nil
+// 		case temp := <-ch:
+// 			buff := make([]json.RawMessage, 0)
+// 			for _, j := range temp {
+// 				buff = append(buff, j.GetData())
+// 			}
+// 			payload := marshalRawMessages(buff)
+
+// 			grcfg := r.cfg.GetGroup(temp[0].GetGroup())
+
+// 			for _, j := range grcfg.GetServiceAddress() {
+// 				go func(address string, data []byte) {
+// 					for attempt := 1; attempt <= grcfg.GetRetry(); attempt++ {
+// 						err := senderMessage(address, data)
+// 						if err == nil {
+// 							return
+// 						}
+// 						log.Printf("Attempt %d/%d failed for %s: %v",
+// 							attempt, grcfg.GetRetry(), address, err)
+// 						if attempt < grcfg.GetRetry() {
+// 							backoff := time.Duration(attempt*attempt) * 100 * time.Millisecond
+// 							time.Sleep(backoff)
+// 						}
+// 					}
+// 					log.Printf("All %d attempts failed for %s", grcfg.GetRetry(), address)
+// 				}(j, payload)
+// 			}
+// 			// fmt.Println(buff)
+// 			// var tes any
+// 			// json.Unmarshal(payload, &tes)
+// 			// fmt.Println(tes)
+// 		}
+// 	}
+// }
+
+// func senderMessage(address string, data []byte) error {
+// 	req, _ := http.NewRequest("POST", address, bytes.NewBuffer(data))
+// 	req.Header.Set("Content-Type", "application/json")
+// 	client := &http.Client{
+// 		Timeout: 5 * time.Second,
+// 	}
+// 	resp, err := client.Do(req)
+// 	if err != nil {
+// 		return fmt.Errorf("Request to %s failed: %v", address, err)
+// 	}
+// 	defer resp.Body.Close()
+// 	if resp.StatusCode >= 400 {
+// 		body, _ := io.ReadAll(resp.Body)
+// 		return fmt.Errorf("Bad response from %s: %d - %s", address, resp.StatusCode, string(body))
+// 	}
+// 	return nil
+// }
+
+// func marshalRawMessages(messages []json.RawMessage) []byte {
+// 	if len(messages) == 0 {
+// 		return []byte("[]")
+// 	}
+// 	buf := bytes.NewBuffer(make([]byte, 0, 1024))
+// 	buf.WriteByte('[')
+// 	buf.Write(messages[0])
+// 	for i := 1; i < len(messages); i++ {
+// 		buf.WriteByte(',')
+// 		buf.Write(messages[i])
+// 	}
+// 	buf.WriteByte(']')
+// 	return buf.Bytes()
+// }

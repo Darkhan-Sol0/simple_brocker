@@ -2,55 +2,64 @@ package event
 
 import (
 	"encoding/json"
-	"time"
 )
 
 type (
-	event struct {
-		group     string
-		data      json.RawMessage
-		create_at time.Time
-		attempts  int
+	eventIn struct {
+		group string
+		data  json.RawMessage
 	}
-	Event interface {
+	EventIn interface {
 		GetGroup() string
 		GetData() json.RawMessage
-		GetCreateDate() time.Time
-		GetCreateDateF() string
-		GetAttempts() int
-		MakeAttempts()
+	}
+
+	eventOut struct {
+		group string
+		data  []json.RawMessage
+	}
+
+	EventOut interface {
+		AddData(data json.RawMessage)
+		GetGroup() string
+		GetData() []json.RawMessage
+		Len() int
 	}
 )
 
-func New(group string, data json.RawMessage) Event {
-	return &event{
-		group:     group,
-		data:      data,
-		create_at: time.Now(),
-		attempts:  0,
+func NewEvIn(group string, data json.RawMessage) EventIn {
+	return &eventIn{
+		group: group,
+		data:  data,
 	}
 }
 
-func (e *event) GetGroup() string {
+func (e *eventIn) GetGroup() string {
 	return e.group
 }
 
-func (e *event) GetData() json.RawMessage {
+func (e *eventIn) GetData() json.RawMessage {
 	return e.data
 }
 
-func (e *event) GetCreateDate() time.Time {
-	return e.create_at
+func NewEvOut(group string) EventOut {
+	return &eventOut{
+		group: group,
+	}
 }
 
-func (e *event) GetCreateDateF() string {
-	return e.create_at.Format("02-01-2006")
+func (e *eventOut) AddData(data json.RawMessage) {
+	e.data = append(e.data, data)
 }
 
-func (e *event) GetAttempts() int {
-	return e.attempts
+func (e *eventOut) GetGroup() string {
+	return e.group
 }
 
-func (e *event) MakeAttempts() {
-	e.attempts++
+func (e *eventOut) GetData() []json.RawMessage {
+	return e.data
+}
+
+func (e *eventOut) Len() int {
+	return len(e.data)
 }

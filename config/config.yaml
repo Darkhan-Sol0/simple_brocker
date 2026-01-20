@@ -3,19 +3,19 @@ cooldown: 20s
 
 group:
   group1:
-    address: ["serv1:8081", "serv2:8082", "serv3:8083"]
+    address: ["http://serv1:8081", "http://serv2:8082", "http://serv3:8083"]
     cooldown: 5s
     batch_size: 10
     retry: 3
 
   group2:
-    address: ["serv1:8081", "serv2:8082"]
+    address: ["http://serv1:8081", "http://serv2:8082"]
     cooldown: 5s
     batch_size: 15
     retry: 3
 
   group3:
-    address: ["serv3:8083"]
+    address: ["http://serv3:8083"]
     cooldown: 5s
     batch_size: 20
     retry: 3

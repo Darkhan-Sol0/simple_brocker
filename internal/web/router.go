@@ -11,16 +11,16 @@ import (
 type (
 	router struct {
 		cfg config.Config
-		ch  chan event.Event
+		ch  chan event.EventIn
 	}
 
 	Router interface {
 		RegisterRoutes(e *echo.Echo)
-		ResponseEvent(ctx context.Context, ch chan []event.Event) error
+		ResponseEvent(ctx context.Context, ch <-chan event.EventOut)
 	}
 )
 
-func New(cfg config.Config, ch chan event.Event) Router {
+func New(cfg config.Config, ch chan event.EventIn) Router {
 	return &router{
 		cfg: cfg,
 		ch:  ch,

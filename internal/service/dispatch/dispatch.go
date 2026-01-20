@@ -2,7 +2,6 @@ package dispatch
 
 import (
 	"context"
-	"fmt"
 	"simple_brocker/internal/config"
 	"simple_brocker/internal/service/event"
 	"time"
@@ -11,21 +10,21 @@ import (
 type (
 	dispatchQueue struct {
 		cfg       config.GroupConf
-		queue     chan event.Event
+		queue     chan event.EventIn
 		groupName string
 	}
 
 	Dispatch interface {
 		Close()
-		AddEvent(event event.Event)
-		TakeEvent(ctx context.Context) []event.Event
+		AddEvent(event event.EventIn)
+		TakeEvent(ctx context.Context) event.EventOut
 	}
 )
 
 func New(cfg config.GroupConf, groupName string) Dispatch {
 	return &dispatchQueue{
 		cfg:       cfg,
-		queue:     make(chan event.Event, 100),
+		queue:     make(chan event.EventIn, 100),
 		groupName: groupName,
 	}
 }
@@ -34,12 +33,12 @@ func (d *dispatchQueue) Close() {
 	close(d.queue)
 }
 
-func (d *dispatchQueue) AddEvent(event event.Event) {
+func (d *dispatchQueue) AddEvent(event event.EventIn) {
 	d.queue <- event
 }
 
-func (d *dispatchQueue) TakeEvent(ctx context.Context) []event.Event {
-	ev := make([]event.Event, 0)
+func (d *dispatchQueue) TakeEvent(ctx context.Context) event.EventOut {
+	ev := event.NewEvOut(d.groupName)
 
 	timer := time.NewTimer(d.cfg.GetCoolDown())
 	defer timer.Stop()
@@ -47,19 +46,17 @@ func (d *dispatchQueue) TakeEvent(ctx context.Context) []event.Event {
 	for {
 		select {
 		case <-ctx.Done():
-			if len(ev) > 0 {
+			if ev.Len() > 0 {
 				return ev
 			}
-			return nil
 		case e := <-d.queue:
-			ev = append(ev, e)
-			if len(ev) >= d.cfg.GetServiceBatchSize() {
+			ev.AddData(e.GetData())
+			if ev.Len() >= d.cfg.GetServiceBatchSize() {
 				return ev
 			}
 			timer.Reset(d.cfg.GetCoolDown())
 		case <-timer.C:
-			if len(ev) > 0 {
-				fmt.Println("Zaderzka")
+			if ev.Len() > 0 {
 				return ev
 			}
 			timer.Reset(d.cfg.GetCoolDown())
