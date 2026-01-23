@@ -11,8 +11,15 @@ import (
 type (
 	config struct {
 		Address string                `yaml:"address"`
+		TLS     TLS                   `yaml:"tls"`
 		Groups  map[string]*groupConf `yaml:"group"`
 		MaxChan int                   `yaml:"max_chan"`
+	}
+
+	TLS struct {
+		Enabled  bool   `yaml:"enabled"`
+		CertPath string `yaml:"cert_path"`
+		KeyPath  string `yaml:"key_path"`
 	}
 
 	groupConf struct {
@@ -30,6 +37,7 @@ type (
 	}
 
 	Config interface {
+		GetTLS() TLS
 		GetAddress() string
 		GetGroups() map[string]*groupConf
 		GetGroup(key string) GroupConf
@@ -52,6 +60,10 @@ func GetConfig() Config {
 		}
 	})
 	return conf
+}
+
+func (c *config) GetTLS() TLS {
+	return c.TLS
 }
 
 func (c *config) GetAddress() string {

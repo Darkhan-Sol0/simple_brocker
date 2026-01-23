@@ -3,12 +3,14 @@ package response
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"simple_brocker/internal/config"
+	"strings"
 	"time"
 )
 
@@ -60,21 +62,37 @@ func senderMessage(ctx context.Context, address string, data []byte) error {
 	default:
 		req, err := http.NewRequestWithContext(ctx, "POST", address, bytes.NewBuffer(data))
 		if err != nil {
-			return fmt.Errorf("err: %v", err)
+			return fmt.Errorf("create request: %w", err)
 		}
 		req.Header.Set("Content-Type", "application/json")
-		client := &http.Client{
-			Timeout: 5 * time.Second,
+		var client *http.Client
+		if strings.HasPrefix(address, "https://") {
+			tr := &http.Transport{
+				TLSClientConfig: &tls.Config{
+					InsecureSkipVerify: true, // TODO: вынести в конфиг
+				},
+			}
+			client = &http.Client{
+				Transport: tr,
+				Timeout:   5 * time.Second,
+			}
+		} else {
+			client = &http.Client{
+				Timeout: 5 * time.Second,
+			}
 		}
+
 		resp, err := client.Do(req)
 		if err != nil {
-			return fmt.Errorf("err: %v", err)
+			return fmt.Errorf("send request: %w", err)
 		}
 		defer resp.Body.Close()
+
 		if resp.StatusCode >= 400 {
 			body, _ := io.ReadAll(resp.Body)
-			return fmt.Errorf("Bad response from %s: %d - %s", address, resp.StatusCode, string(body))
+			return fmt.Errorf("bad response %d: %s", resp.StatusCode, string(body))
 		}
+
 		return nil
 	}
 }

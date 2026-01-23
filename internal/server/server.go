@@ -2,7 +2,7 @@ package server
 
 import (
 	"context"
-	"net/http"
+	"log"
 	"os"
 	"os/signal"
 	"simple_brocker/internal/config"
@@ -48,7 +48,22 @@ func New() Server {
 }
 
 func (s *server) start() {
-	if err := s.httpDriver.Start(s.cfg.GetAddress()); err != nil && err != http.ErrServerClosed {
+	if s.cfg.GetTLS().Enabled {
+		if s.cfg.GetTLS().CertPath == "" || s.cfg.GetTLS().KeyPath == "" {
+			log.Fatal("TLS enabled but cert_path or key_path not specified")
+		}
+		certFile := s.cfg.GetTLS().CertPath
+		keyFile := s.cfg.GetTLS().KeyPath
+
+		log.Printf("Starting HTTPS server at %s", s.cfg.GetAddress())
+		if err := s.httpDriver.StartTLS(s.cfg.GetAddress(), certFile, keyFile); err != nil {
+			log.Fatalf("Failed to start HTTPS server: %v", err)
+		}
+	} else {
+		log.Printf("Starting HTTP server at %s", s.cfg.GetAddress())
+		if err := s.httpDriver.Start(s.cfg.GetAddress()); err != nil {
+			log.Fatalf("Failed to start HTTP server: %v", err)
+		}
 	}
 }
 

@@ -2,6 +2,11 @@ address: "0.0.0.0:8080"
 cooldown: 20s
 max_chan: 10
 
+tls:
+  enabled: false
+  cert_path: "/etc/ssl/cert.pem"
+  key_path: "/etc/ssl/key.pem"
+
 group:
   group1:
     address: ["http://serv1:8081", "http://serv2:8082", "http://serv3:8083"]
