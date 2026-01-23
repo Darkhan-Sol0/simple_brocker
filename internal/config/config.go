@@ -32,6 +32,7 @@ type (
 		GetAddress() string
 		GetGroups() map[string]*groupConf
 		GetGroup(key string) GroupConf
+		CheckGroup(group string) bool
 	}
 )
 
@@ -77,4 +78,8 @@ func (g *groupConf) GetServiceBatchSize() int {
 
 func (g *groupConf) GetRetry() int {
 	return g.Retry
+}
+
+func (c *config) CheckGroup(group string) bool {
+	return c.Groups[group] != nil
 }

@@ -35,7 +35,7 @@ func New() Server {
 	cfg := config.GetConfig()
 	thread := thread.New(cfg)
 	processor := processor.New(thread)
-	request := request.New(thread.GetIn())
+	request := request.New(cfg, thread.GetIn())
 	response := response.New(cfg, thread.GetOut())
 	return &server{
 		httpDriver: echo.New(),

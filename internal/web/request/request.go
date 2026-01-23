@@ -3,6 +3,7 @@ package request
 import (
 	"io"
 	"net/http"
+	"simple_brocker/internal/config"
 	"simple_brocker/internal/service/container"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 
 type (
 	request struct {
+		cfg     config.Config
 		chanIn  chan<- container.Container
 		sem     chan struct{}
 		timeout time.Duration
@@ -21,13 +23,14 @@ type (
 	}
 )
 
-func New(chanIn chan<- container.Container) Request {
+func New(cfg config.Config, chanIn chan<- container.Container) Request {
 	sem := make(chan struct{}, 10)
 	for i := 0; i < 10; i++ {
 		sem <- struct{}{}
 	}
 
 	return &request{
+		cfg:     cfg,
 		chanIn:  chanIn,
 		sem:     sem,
 		timeout: 5 * time.Second,
@@ -42,8 +45,13 @@ func (r *request) RequestIn(ctx echo.Context) error {
 	select {
 	case <-r.sem:
 		defer func() { r.sem <- struct{}{} }()
-
 		group := ctx.Param("group")
+		if r.cfg.CheckGroup(group) == false {
+			return ctx.JSON(http.StatusBadRequest, map[string]string{
+				"error": "invalid group " + group,
+			})
+		}
+
 		data, err := io.ReadAll(ctx.Request().Body)
 		if err != nil {
 			return ctx.JSON(http.StatusBadRequest, map[string]string{

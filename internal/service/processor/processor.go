@@ -3,15 +3,15 @@ package processor
 import (
 	"context"
 	"simple_brocker/internal/config"
+	"simple_brocker/internal/service/batcher"
 	"simple_brocker/internal/service/container"
-	"simple_brocker/internal/service/fsaver"
 	"simple_brocker/internal/service/thread"
 )
 
 type (
 	processor struct {
-		thread thread.Thread
-		fsaver fsaver.Fsaver
+		thread  thread.Thread
+		batcher batcher.Fsaver
 	}
 
 	Processor interface {
@@ -22,8 +22,8 @@ type (
 
 func New(thread thread.Thread) Processor {
 	return &processor{
-		thread: thread,
-		fsaver: fsaver.New(config.GetConfig()),
+		thread:  thread,
+		batcher: batcher.New(config.GetConfig()),
 	}
 }
 
@@ -33,7 +33,7 @@ func (p *processor) Producer(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case data := <-p.thread.GetIn():
-			p.fsaver.LogData(data)
+			p.batcher.LogData(data)
 		}
 	}
 
@@ -47,7 +47,7 @@ func (p *processor) Consumer(ctx context.Context) {
 				case <-ctx.Done():
 					return
 				default:
-					data := p.fsaver.ReadData(ctx, group)
+					data := p.batcher.ReadData(ctx, group)
 					chanOut <- data
 				}
 			}
