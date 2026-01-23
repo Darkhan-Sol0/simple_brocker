@@ -11,19 +11,19 @@ import (
 type (
 	fsaver struct {
 		cfg    config.Config
-		tempCh map[string]chan container.Container
+		tempCh map[string]chan []byte
 	}
 
 	Fsaver interface {
 		LogData(data container.Container)
-		ReadData(ctx context.Context, group string) container.Container
+		ReadData(ctx context.Context, group string) []byte
 	}
 )
 
 func New(cfg config.Config) Fsaver {
-	tempCh := make(map[string]chan container.Container)
+	tempCh := make(map[string]chan []byte)
 	for i := range cfg.GetGroups() {
-		tempCh[i] = make(chan container.Container, 100)
+		tempCh[i] = make(chan []byte, 100)
 	}
 	return &fsaver{
 		cfg:    cfg,
@@ -32,10 +32,10 @@ func New(cfg config.Config) Fsaver {
 }
 
 func (l *fsaver) LogData(data container.Container) {
-	l.tempCh[data.Group] <- data
+	l.tempCh[data.Group] <- data.Data
 }
 
-func (l *fsaver) ReadData(ctx context.Context, group string) container.Container {
+func (l *fsaver) ReadData(ctx context.Context, group string) []byte {
 	data := make([][]byte, 0)
 	timer := time.NewTimer(l.cfg.GetGroup(group).GetCoolDown())
 	defer timer.Stop()
@@ -44,27 +44,18 @@ func (l *fsaver) ReadData(ctx context.Context, group string) container.Container
 		select {
 		case <-ctx.Done():
 			if len(data) > 0 {
-				return container.Container{
-					Group: group,
-					Data:  marshalBytes(data),
-				}
+				return marshalBytes(data)
 			}
-			continue
+			return []byte("[]")
 		case d := <-l.tempCh[group]:
-			data = append(data, d.Data)
+			data = append(data, d)
 			if len(data) >= l.cfg.GetGroup(group).GetServiceBatchSize() {
-				return container.Container{
-					Group: group,
-					Data:  marshalBytes(data),
-				}
+				return marshalBytes(data)
 			}
 			timer.Reset(l.cfg.GetGroup(group).GetCoolDown())
 		case <-timer.C:
 			if len(data) > 0 {
-				return container.Container{
-					Group: group,
-					Data:  marshalBytes(data),
-				}
+				return marshalBytes(data)
 			}
 			timer.Reset(l.cfg.GetGroup(group).GetCoolDown())
 		}

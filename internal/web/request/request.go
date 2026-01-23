@@ -24,8 +24,9 @@ type (
 )
 
 func New(cfg config.Config, chanIn chan<- container.Container) Request {
-	sem := make(chan struct{}, 10)
-	for i := 0; i < 10; i++ {
+	count := cfg.GetMaxChan()
+	sem := make(chan struct{}, count)
+	for i := 0; i < count; i++ {
 		sem <- struct{}{}
 	}
 
@@ -46,7 +47,7 @@ func (r *request) RequestIn(ctx echo.Context) error {
 	case <-r.sem:
 		defer func() { r.sem <- struct{}{} }()
 		group := ctx.Param("group")
-		if r.cfg.CheckGroup(group) == false {
+		if !r.cfg.CheckGroup(group) {
 			return ctx.JSON(http.StatusBadRequest, map[string]string{
 				"error": "invalid group " + group,
 			})

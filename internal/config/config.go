@@ -12,6 +12,7 @@ type (
 	config struct {
 		Address string                `yaml:"address"`
 		Groups  map[string]*groupConf `yaml:"group"`
+		MaxChan int                   `yaml:"max_chan"`
 	}
 
 	groupConf struct {
@@ -33,6 +34,7 @@ type (
 		GetGroups() map[string]*groupConf
 		GetGroup(key string) GroupConf
 		CheckGroup(group string) bool
+		GetMaxChan() int
 	}
 )
 
@@ -58,6 +60,10 @@ func (c *config) GetAddress() string {
 
 func (c *config) GetGroups() map[string]*groupConf {
 	return c.Groups
+}
+
+func (c *config) GetMaxChan() int {
+	return c.MaxChan
 }
 
 func (c *config) GetGroup(key string) GroupConf {

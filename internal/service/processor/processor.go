@@ -4,7 +4,6 @@ import (
 	"context"
 	"simple_brocker/internal/config"
 	"simple_brocker/internal/service/batcher"
-	"simple_brocker/internal/service/container"
 	"simple_brocker/internal/service/thread"
 )
 
@@ -36,12 +35,11 @@ func (p *processor) Producer(ctx context.Context) {
 			p.batcher.LogData(data)
 		}
 	}
-
 }
 
 func (p *processor) Consumer(ctx context.Context) {
 	for i, j := range p.thread.GetOut() {
-		go func(group string, chanOut chan<- container.Container) {
+		go func(group string, chanOut chan<- []byte) {
 			for {
 				select {
 				case <-ctx.Done():

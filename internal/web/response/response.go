@@ -3,19 +3,19 @@ package response
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"simple_brocker/internal/config"
-	"simple_brocker/internal/service/container"
 	"time"
 )
 
 type (
 	response struct {
 		cfg     config.Config
-		chanOut map[string]chan container.Container
+		chanOut map[string]chan []byte
 	}
 
 	Response interface {
@@ -23,7 +23,7 @@ type (
 	}
 )
 
-func New(cfg config.Config, chanOut map[string]chan container.Container) Response {
+func New(cfg config.Config, chanOut map[string]chan []byte) Response {
 	return &response{
 		cfg:     cfg,
 		chanOut: chanOut,
@@ -32,15 +32,19 @@ func New(cfg config.Config, chanOut map[string]chan container.Container) Respons
 
 func (r *response) Sender(ctx context.Context) {
 	for i, j := range r.chanOut {
-		go func(group string, chanOut <-chan container.Container) {
+		go func(group string, chanOut <-chan []byte) {
 			for {
 				select {
 				case <-ctx.Done():
 					return
 				case data := <-chanOut:
+					fmt.Println(data)
+					var h any
+					json.Unmarshal(data, &h)
+					fmt.Println(h)
 					address := r.cfg.GetGroup(group).GetServiceAddress()
 					for _, k := range address {
-						go retrySender(ctx, k, r.cfg.GetGroup(group).GetRetry(), data.Data)
+						go retrySender(ctx, k, r.cfg.GetGroup(group).GetRetry(), data)
 					}
 
 				}

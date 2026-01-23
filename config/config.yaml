@@ -1,5 +1,6 @@
 address: "0.0.0.0:8080"
 cooldown: 20s
+max_chan: 10
 
 group:
   group1:

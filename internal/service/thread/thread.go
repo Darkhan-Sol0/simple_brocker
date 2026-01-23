@@ -8,23 +8,23 @@ import (
 type (
 	thread struct {
 		chanIn  chan container.Container
-		chanOut map[string]chan container.Container
+		chanOut map[string]chan []byte
 	}
 
 	Thread interface {
 		Close()
 
 		GetIn() chan container.Container
-		GetOut() map[string]chan container.Container
+		GetOut() map[string]chan []byte
 	}
 )
 
 func New(cfg config.Config) Thread {
 
 	chanIn := make(chan container.Container, 100)
-	chanOut := make(map[string]chan container.Container)
+	chanOut := make(map[string]chan []byte)
 	for i := range cfg.GetGroups() {
-		chanOut[i] = make(chan container.Container, 100)
+		chanOut[i] = make(chan []byte, 100)
 	}
 
 	return &thread{
@@ -45,6 +45,6 @@ func (t *thread) GetIn() chan container.Container {
 	return t.chanIn
 }
 
-func (t *thread) GetOut() map[string]chan container.Container {
+func (t *thread) GetOut() map[string]chan []byte {
 	return t.chanOut
 }
